@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import math
 import sys
 import time
@@ -23,6 +24,8 @@ from vrc_smith_auto.input import SpyMouseBackend, Win32SendInputMouse
 from vrc_smith_auto.protocols import FramePacket, MouseBackend
 from vrc_smith_auto.vision.detector import GaugeDetector
 from vrc_smith_auto.window import enable_dpi_awareness, find_vrchat_window
+
+logger = logging.getLogger(__name__)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -52,7 +55,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--dry-run",
         action="store_true",
         default=None,
-        help="Run detection and state machine without sending OS mouse clicks.",
+        help="Run detection and state machine without sending OS input.",
     )
     p_run.add_argument(
         "--preview",
@@ -182,13 +185,14 @@ def _cmd_run(args: argparse.Namespace) -> int:
         enable_dpi_awareness()
 
     try:
+        logger.info("Initializing screen capture (backend=%s, monitor=%d)", cfg.capture.backend, cfg.capture.monitor_idx)
         source = create_live_capture(cfg, probe=True)
     except (CaptureError, OSError, RuntimeError, ValueError) as exc:
         _print_err(f"Failed to initialize live capture: {exc}")
         return 1
 
     mouse: MouseBackend
-    if cfg.dry_run:
+    if cfg.dry_run and not cfg.auto_fire_up:
         mouse = SpyMouseBackend()
     else:
         class_arg = cfg.window.class_name or None
@@ -207,6 +211,11 @@ def _cmd_run(args: argparse.Namespace) -> int:
     preview = PreviewWindow() if args.preview else None
 
     try:
+        logger.info(
+            "Started with %s capture. %s F8 pauses or resumes. Esc stops.",
+            type(source).__name__,
+            "Dry run." if cfg.dry_run else "Keep VRChat in the foreground." if cfg.require_foreground else "",
+        )
         runner = Runner(
             source=source,
             mouse=mouse,
@@ -462,6 +471,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.command == "run":
+        logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
         return _cmd_run(args)
     if args.command == "verify-image":
         return _cmd_verify_image(args)

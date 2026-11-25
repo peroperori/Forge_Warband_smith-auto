@@ -45,6 +45,9 @@ package-dir = {"" = "src"}
 where = ["src"]
 include = ["vrc_smith_auto*"]
 
+[tool.setuptools.package-data]
+vrc_smith_auto = ["images/*.png"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]

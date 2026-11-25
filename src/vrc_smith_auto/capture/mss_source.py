@@ -160,6 +160,7 @@ class MssCapture:
             image_bgr=image_bgr,
             timestamp_s=float(self._clock_fn()),
             frame_idx=idx,
+            screen_rect=target,
         )
 
     def close(self) -> None:

@@ -208,6 +208,8 @@ class TriggerConfig:
     max_lead_offset: float = 2.0
     rearm_lost_frames: int = 3
     dry_run: bool = False
+    auto_fire_up: bool = False
+    auto_sell: bool = False
 
     def __post_init__(self) -> None:
         hold = _require_float(self.hold_ms, "trigger.hold_ms")
@@ -239,6 +241,8 @@ class TriggerConfig:
             raise ValueError("trigger.rearm_lost_frames must be >= 1")
 
         dry_run = _require_bool(self.dry_run, "trigger.dry_run")
+        _require_bool(self.auto_fire_up, "trigger.auto_fire_up")
+        _require_bool(self.auto_sell, "trigger.auto_sell")
 
         object.__setattr__(self, "hold_ms", hold)
         object.__setattr__(self, "cooldown_ms", cooldown)
@@ -321,6 +325,8 @@ _FLAT_ALIASES: dict[str, tuple[str, ...]] = {
     "max_lead_offset": ("trigger", "max_lead_offset"),
     "rearm_lost_frames": ("trigger", "rearm_lost_frames"),
     "dry_run": ("trigger", "dry_run"),
+    "auto_fire_up": ("trigger", "auto_fire_up"),
+    "auto_sell": ("trigger", "auto_sell"),
 }
 
 _SECTION_KEYS: dict[str, set[str]] = {
@@ -335,6 +341,8 @@ _SECTION_KEYS: dict[str, set[str]] = {
         "max_lead_offset",
         "rearm_lost_frames",
         "dry_run",
+        "auto_fire_up",
+        "auto_sell",
     },
     "geometry": {
         "reference_height",
@@ -489,6 +497,14 @@ class AppConfig:
     @property
     def dry_run(self) -> bool:
         return self.trigger.dry_run
+
+    @property
+    def auto_fire_up(self) -> bool:
+        return self.trigger.auto_fire_up
+
+    @property
+    def auto_sell(self) -> bool:
+        return self.trigger.auto_sell
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

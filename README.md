@@ -35,7 +35,7 @@ pip install -e .
 .\.venv\Scripts\python.exe -m vrc_smith_auto run --dry-run --preview
 ```
 
-此模式不會送出實際滑鼠點擊。在預覽視窗按 `q` 或關閉視窗即可退出。
+此模式不會移動游標、點擊滑鼠或按下 Tab。在預覽視窗按 `q` 或關閉視窗即可退出。
 
 3. 確認偵測正常後執行：
 
@@ -127,7 +127,13 @@ trigger:
   max_lead_offset: 2.0
   rearm_lost_frames: 3
   dry_run: false
+  auto_fire_up: false
+  auto_sell: false
 ```
+
+- `auto_fire_up: true`：辨識到「锤!」停用時，自動點擊「开炉」。等「锤!」恢復可用後，將游標移到按鈕並恢復金色區域判定。
+- `auto_sell: true`：搭配 `auto_fire_up` 使用。點擊「开炉」後從 500 毫秒開始檢查按鈕狀態，至少等待 1.5 秒，並在連續兩次辨識到可用的「开炉」與停用的「锤!」時按 Tab 開啟選單。進入「铁匠铺」逐格雙擊出售倉庫物品。確認倉庫清空後，再按 Tab 並恢復鍛造。此設定會出售倉庫內所有物品。
+- 按鈕與倉庫的辨識圖片以 1920×1080 為基準，會依 VRChat 用戶端視窗的大小調整。請讓完整的遊戲視窗留在擷取範圍內。
 
 載入方式：
 

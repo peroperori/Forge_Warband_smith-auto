@@ -8,6 +8,7 @@ from vrc_smith_auto.input.win32_sendinput import (
     _validate_duration_ms,
     _validate_finite_float,
 )
+from vrc_smith_auto.window import WindowRect
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,6 +47,12 @@ class SpyMouseBackend:
 
     def set_frame_idx(self, frame_idx: int | None) -> None:
         self._current_frame_idx = frame_idx
+
+    def move_cursor(self, rect: WindowRect | None, x: int, y: int) -> bool:
+        return True
+
+    def press_tab(self, rect: WindowRect | None) -> bool:
+        return True
 
     def press_left(self, duration_ms: float, timestamp_s: float | None = None) -> bool:
         dur_ms = _validate_duration_ms(duration_ms)

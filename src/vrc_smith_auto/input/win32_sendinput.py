@@ -10,6 +10,8 @@ from ctypes import wintypes
 from typing import Any, Callable
 
 from vrc_smith_auto.window import (
+    WindowRect,
+    get_client_rect,
     is_current_process_elevated,
     is_foreground_window,
     is_target_elevated,
@@ -20,6 +22,10 @@ logger = logging.getLogger(__name__)
 INPUT_MOUSE = 0
 INPUT_KEYBOARD = 1
 INPUT_HARDWARE = 2
+
+TAB_SCAN_CODE = 0x0F
+KEYEVENTF_KEYUP = 0x0002
+KEYEVENTF_SCANCODE = 0x0008
 
 MOUSEEVENTF_MOVE = 0x0001
 MOUSEEVENTF_LEFTDOWN = 0x0002
@@ -201,6 +207,89 @@ class Win32SendInputMouse:
             self._send_input_fn = _get_win32_send_input()
         return int(self._send_input_fn(inp))
 
+    def _allows_input(self, hwnd: int | None) -> bool:
+        if self._require_foreground:
+            if hwnd is None or hwnd <= 0:
+                self._last_blocked_reason = "no_target_window"
+                return False
+            if not self._is_foreground_fn(hwnd):
+                self._last_blocked_reason = "not_foreground"
+                return False
+
+        if self._check_uipi and hwnd is not None and hwnd > 0:
+            target_elevated = self._is_target_elevated_fn(hwnd)
+            current_elevated = self._is_current_elevated_fn()
+            if target_elevated is True and current_elevated is False:
+                self._uipi_blocked = True
+                self._last_blocked_reason = "uipi_elevation_mismatch"
+                logger.warning(
+                    "UIPI elevation mismatch: target window (hwnd=%s) is running elevated "
+                    "while this tool is not. Run this tool as Administrator or run VRChat un-elevated.",
+                    hwnd,
+                )
+                return False
+        return True
+
+    def client_rect(self) -> WindowRect | None:
+        hwnd = self._resolve_hwnd()
+        return get_client_rect(hwnd) if hwnd else None
+
+    def _allows_ui_input(self, rect: WindowRect | None) -> bool:
+        self._last_blocked_reason = None
+        hwnd = self._resolve_hwnd()
+        current = get_client_rect(hwnd) if hwnd else None
+        if current is None:
+            self._last_blocked_reason = "no_target_window"
+            return False
+        if rect != current:
+            self._last_blocked_reason = "window_moved_or_resized"
+            return False
+        return self._allows_input(hwnd)
+
+    def move_cursor(self, rect: WindowRect | None, x: int, y: int) -> bool:
+        if rect is None or not (0 <= x < rect.width and 0 <= y < rect.height):
+            return False
+        with self._lock:
+            if not self._allows_ui_input(rect):
+                return False
+            if not ctypes.windll.user32.SetCursorPos(rect.left + x, rect.top + y):
+                self._last_blocked_reason = "set_cursor_pos_failed"
+                return False
+            return True
+
+    def press_tab(self, rect: WindowRect | None) -> bool:
+        with self._lock:
+            if not self._allows_ui_input(rect):
+                return False
+            down = INPUT(
+                type=INPUT_KEYBOARD, ki=KEYBDINPUT(wScan=TAB_SCAN_CODE, dwFlags=KEYEVENTF_SCANCODE)
+            )
+            up = INPUT(
+                type=INPUT_KEYBOARD,
+                ki=KEYBDINPUT(wScan=TAB_SCAN_CODE, dwFlags=KEYEVENTF_SCANCODE | KEYEVENTF_KEYUP),
+            )
+            if self._send(down) != 1:
+                self._last_blocked_reason = f"tab_key_down_failed_{self._get_last_error_fn()}"
+                return False
+            try:
+                time.sleep(0.10)
+            finally:
+                released = self._send(up) == 1
+            if not released:
+                raise RuntimeError("Failed to release Tab after opening or closing Smithy")
+            return True
+
+    def move_relative(self, rect: WindowRect, dx: int, dy: int) -> bool:
+        """Send ordinary mouse motion for applications that render their own cursor."""
+        with self._lock:
+            if not self._allows_ui_input(rect):
+                return False
+            event = INPUT(type=INPUT_MOUSE, mi=MOUSEINPUT(dx=dx, dy=dy, dwFlags=MOUSEEVENTF_MOVE))
+            if self._send(event) == 1:
+                return True
+            self._last_blocked_reason = f"mouse_move_failed_{self._get_last_error_fn()}"
+            return False
+
     def press_left(self, duration_ms: float, timestamp_s: float | None = None) -> bool:
         dur_ms = _validate_duration_ms(duration_ms)
         ts = _validate_finite_float(timestamp_s, "timestamp_s") if timestamp_s is not None else None
@@ -212,27 +301,8 @@ class Win32SendInputMouse:
                 self._last_blocked_reason = "already_pressed"
                 return False
 
-            hwnd = self._resolve_hwnd()
-            if self._require_foreground:
-                if hwnd is None or hwnd <= 0:
-                    self._last_blocked_reason = "no_target_window"
-                    return False
-                if not self._is_foreground_fn(hwnd):
-                    self._last_blocked_reason = "not_foreground"
-                    return False
-
-            if self._check_uipi and hwnd is not None and hwnd > 0:
-                target_elevated = self._is_target_elevated_fn(hwnd)
-                current_elevated = self._is_current_elevated_fn()
-                if target_elevated is True and current_elevated is False:
-                    self._uipi_blocked = True
-                    self._last_blocked_reason = "uipi_elevation_mismatch"
-                    logger.warning(
-                        "UIPI elevation mismatch: target window (hwnd=%s) is running elevated "
-                        "while this tool is not. Run this tool as Administrator or run VRChat un-elevated.",
-                        hwnd,
-                    )
-                    return False
+            if not self._allows_input(self._resolve_hwnd()):
+                return False
 
             inp = build_mouse_left_input(MOUSEEVENTF_LEFTDOWN)
             sent = self._send(inp)

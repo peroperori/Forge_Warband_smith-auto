@@ -1,0 +1,23 @@
+capture:
+  backend: mss
+  target_fps: 60
+  monitor_idx: 0
+  crop_to_window: true
+
+window:
+  title: VRChat
+  class_name: UnityWndClass
+  require_foreground: true
+  rect_refresh_s: 1.0
+
+trigger:
+  hold_ms: 1.0
+  cooldown_ms: 200.0
+  entry_margin: 0.95
+  exit_margin: 1.25
+  lead_ms: 8.3
+  max_lead_offset: 2.0
+  rearm_lost_frames: 3
+  dry_run: false
+  auto_fire_up: true
+  auto_sell: true

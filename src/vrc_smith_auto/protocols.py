@@ -5,6 +5,8 @@ from typing import Protocol, runtime_checkable
 
 import numpy as np
 
+from vrc_smith_auto.window import WindowRect
+
 
 @dataclass(frozen=True, slots=True)
 class FramePacket:
@@ -13,6 +15,7 @@ class FramePacket:
     image_bgr: np.ndarray
     timestamp_s: float
     frame_idx: int
+    screen_rect: WindowRect | None = None
 
     @property
     def height(self) -> int:
@@ -60,3 +63,10 @@ class MouseBackend(Protocol):
     def release_all(self) -> None:
         """Immediately release any held mouse button (idempotent, safe in finally)."""
         ...
+
+
+@runtime_checkable
+class SmithyInput(MouseBackend, Protocol):
+    def move_cursor(self, rect: WindowRect | None, x: int, y: int) -> bool: ...
+
+    def press_tab(self, rect: WindowRect | None) -> bool: ...
